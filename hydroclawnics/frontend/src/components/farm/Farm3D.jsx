@@ -1,8 +1,8 @@
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import PodMesh from './PodMesh'
-import useCameraControls from './useCameraControls'
-import useFarm3D from './useFarm3D'
+import useCameraControls from '../../hooks/useCameraControls'
+import useFarm3D from '../../hooks/useFarm3D'
 
 function Scene({ mappedPods, onPodSelect, controls }) {
   const { orbitRef, tick, autoRotateEnabled, mode, resetToCenter } = controls

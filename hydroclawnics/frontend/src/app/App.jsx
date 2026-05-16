@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import AgentLog from './AgentLog'
-import Farm3D from './Farm3D'
-import Navbar from './Navbar'
-import PodDetailModal from './PodDetailModal'
-import PodGrid from './PodGrid'
-import SettingsPanel from './SettingsPanel'
-import useWebSocket from './useWebSocket'
+import AgentLog from '../components/logs/AgentLog'
+import Farm3D from '../components/farm/Farm3D'
+import Navbar from '../components/layout/Navbar'
+import PodDetailModal from '../components/pods/PodDetailModal'
+import PodGrid from '../components/pods/PodGrid'
+import SettingsPanel from '../components/settings/SettingsPanel'
+import useWebSocket from '../hooks/useWebSocket'
 
 export default function App() {
   const { pods, agentLog, connectionStatus } = useWebSocket()
