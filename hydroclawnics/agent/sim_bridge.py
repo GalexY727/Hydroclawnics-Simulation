@@ -146,7 +146,24 @@ class _ZoneState:
 def _get_zone(zone_id: str) -> _ZoneState:
     if zone_id not in _state:
         crop = ZONE_CROP_MAP.get(zone_id, "lettuce")
-        _state[zone_id] = _ZoneState(zone_id=zone_id, crop=crop)
+        targets = CROP_TARGETS[crop]
+        # Initialize at midpoint of each range so status starts healthy
+        def _mid(lo: float, hi: float | None) -> float:
+            return (lo + hi) / 2.0 if hi is not None else lo + 10.0
+        zone = _ZoneState(
+            zone_id=zone_id,
+            crop=crop,
+            temp_c=_mid(*targets["air_temp_c"]),
+            water_temp_c=_mid(*targets["water_temp_c"]),
+            humidity_pct=_mid(*targets["humidity_pct"]),
+            ph=_mid(*targets["ph"]),
+            ec_ppm=_mid(*targets["ec_ppm"]),
+            water_level=_mid(*targets["water_level"]),
+            target_temp_c=_mid(*targets["air_temp_c"]),
+            target_humidity_percent=_mid(*targets["humidity_pct"]),
+        )
+        zone.plant_status, zone.fault_type = _evaluate_zone(zone)
+        _state[zone_id] = zone
     return _state[zone_id]
 
 
