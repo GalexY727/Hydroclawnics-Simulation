@@ -271,12 +271,14 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
             model=_TABLE_AGENT_MODEL,
             messages=messages,
             temperature=0.2,
-            max_tokens=512,
+            max_tokens=1500,
+            stop=["\n\n\n", "## Zone", "User:", "<|endoftext|>"],
         )
         if response.choices[0].finish_reason == "length":
             logger.warning("[%s] API truncated response (finish_reason=length)", table_id)
-            reasoning_text = ""
-            break
+            # We don't wipe the reasoning text anymore just because it was long
+            # reasoning_text = ""
+            # break
         msg = response.choices[0].message
         assistant_msg: dict = {"role": "assistant"}
         if msg.content is not None:
