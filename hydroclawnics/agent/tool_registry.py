@@ -231,6 +231,90 @@ TOOLS: list[ToolDef] = [
             "required": ["zone_id"],
         },
     ),
+    ToolDef(
+        name="dose_acid",
+        description=(
+            "Add acid solution to lower the reservoir pH. Use when pH is above the target range. "
+            "Specify amount_ml between 1–50. Each 10 ml lowers pH by ~0.2 units. "
+            "Always re-check pH 15 minutes after dosing before adding more."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "zone_id": {"type": "string", "description": "Zone ID (T1–T4)"},
+                "amount_ml": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Volume of acid solution to add in millilitres (1–50)",
+                },
+            },
+            "required": ["zone_id", "amount_ml"],
+        },
+    ),
+    ToolDef(
+        name="dose_base",
+        description=(
+            "Add pH-up (base) solution to raise the reservoir pH. Use when pH is below the target "
+            "range. Specify amount_ml between 1–50. Each 10 ml raises pH by ~0.2 units. "
+            "Always re-check pH 15 minutes after dosing before adding more."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "zone_id": {"type": "string", "description": "Zone ID (T1–T4)"},
+                "amount_ml": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Volume of base solution to add in millilitres (1–50)",
+                },
+            },
+            "required": ["zone_id", "amount_ml"],
+        },
+    ),
+    ToolDef(
+        name="dose_nutrients",
+        description=(
+            "Add concentrated nutrient solution to raise the reservoir EC (electrical conductivity). "
+            "Use when EC is below the target range for the crop. Specify amount_ml between 10–200. "
+            "Each 50 ml raises EC by ~50 ppm."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "zone_id": {"type": "string", "description": "Zone ID (T1–T4)"},
+                "amount_ml": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 200,
+                    "description": "Volume of nutrient concentrate to add in millilitres (10–200)",
+                },
+            },
+            "required": ["zone_id", "amount_ml"],
+        },
+    ),
+    ToolDef(
+        name="flush_reservoir",
+        description=(
+            "Dilute the nutrient reservoir with fresh water to lower the EC. Use when EC is above "
+            "the target range. Specify flush_percent (10–50) as the fraction of reservoir volume "
+            "to replace with fresh water. Each 10% flush reduces EC by roughly 8–12%."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "zone_id": {"type": "string", "description": "Zone ID (T1–T4)"},
+                "flush_percent": {
+                    "type": "number",
+                    "minimum": 10,
+                    "maximum": 50,
+                    "description": "Percentage of reservoir to replace with fresh water (10–50)",
+                },
+            },
+            "required": ["zone_id", "flush_percent"],
+        },
+    ),
 ]
 
 TOOL_MAP: dict[str, ToolDef] = {t.name: t for t in TOOLS}

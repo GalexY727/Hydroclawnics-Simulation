@@ -23,6 +23,7 @@ class _ZoneState:
     dehumidifier_on: bool = False
     water_level: float = 75.0
     ph: float = 6.2
+    ec_ppm: float = 1000.0
     target_temp_c: float = 22.0
     target_humidity_percent: float = 65.0
     last_updated: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -90,6 +91,18 @@ def execute_command(tool_name: str, params: dict) -> dict:
             zone.fan_on = True
             zone.fan_speed = 75
             zone.humidifier_on = False
+        case "dose_acid":
+            amount_ml = float(params.get("amount_ml", 10))
+            zone.ph = max(4.0, zone.ph - amount_ml * 0.02)
+        case "dose_base":
+            amount_ml = float(params.get("amount_ml", 10))
+            zone.ph = min(9.0, zone.ph + amount_ml * 0.02)
+        case "dose_nutrients":
+            amount_ml = float(params.get("amount_ml", 50))
+            zone.ec_ppm = min(3000.0, zone.ec_ppm + amount_ml * 1.0)
+        case "flush_reservoir":
+            flush_pct = float(params.get("flush_percent", 20)) / 100.0
+            zone.ec_ppm = max(100.0, zone.ec_ppm * (1.0 - flush_pct))
         case _:
             return {"ok": False, "error": f"Unknown command: {tool_name}"}
 
@@ -115,6 +128,7 @@ def get_sensor_state(zone_id: str) -> dict:
         "humidity_pct": round(zone.humidity_pct, 2),
         "water_level": round(zone.water_level, 1),
         "ph": round(zone.ph, 2),
+        "ec_ppm": round(zone.ec_ppm, 1),
         "health_score": round(health, 3),
         "status": status,
         "fan_on": zone.fan_on,
@@ -158,6 +172,7 @@ async def _tick() -> None:
                 zone.humidity_pct = max(20.0, min(95.0, zone.humidity_pct + random.gauss(0, 0.5)))
 
             zone.ph = max(4.0, min(9.0, zone.ph + random.gauss(0, 0.03)))
+            zone.ec_ppm = max(100.0, min(3000.0, zone.ec_ppm + random.gauss(0, 5.0)))
             zone.last_updated = datetime.now(timezone.utc).isoformat()
 
         # Randomly introduce faults ~10% of ticks to simulate real conditions
