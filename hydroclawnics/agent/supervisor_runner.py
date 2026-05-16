@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 
 from openai import AsyncOpenAI
 
@@ -87,6 +88,9 @@ def _extract_json(raw: str) -> str:
         return raw.split("```json")[1].split("```")[0].strip()
     if "```" in raw:
         return raw.split("```")[1].split("```")[0].strip()
+    m = re.search(r"\{[\s\S]*\}", raw)
+    if m:
+        return m.group(0).strip()
     return raw.strip()
 
 
