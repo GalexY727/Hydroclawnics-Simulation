@@ -50,10 +50,6 @@ export default function useWebSocket() {
   const wsRef = useRef(null)
 
   const wsUrl = useMemo(() => {
-    // # FIX: Use the FastAPI socket directly in Vite dev, and the current host after production build.
-    if (import.meta.env.DEV) {
-      return 'ws://localhost:8000/ws'
-    }
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
     return `${protocol}://${window.location.host}/ws`
   }, [])
