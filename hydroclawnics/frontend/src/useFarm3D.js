@@ -1,7 +1,7 @@
 const STATUS_COLOR = {
-  healthy: '#4ade80',
-  warning: '#facc15',
-  critical: '#f87171',
+  healthy: '#7fb069',
+  warning: '#d4a373',
+  critical: '#c9566b',
 }
 
 export default function useFarm3D(pods) {

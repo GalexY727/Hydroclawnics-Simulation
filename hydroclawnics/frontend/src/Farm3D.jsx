@@ -32,13 +32,14 @@ export default function Farm3D({ pods, onPodSelect }) {
   const [focus, setFocus] = useState(null)
 
   return (
-    <div className="h-[420px] w-full overflow-hidden border border-slate-700 bg-slate-900">
-      <Canvas camera={{ position: [0, 9, 12], fov: 50 }}>
-        <ambientLight intensity={0.65} />
-        <directionalLight position={[5, 10, 6]} intensity={1.1} />
+    <div className="min-h-0 flex-1 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
+      <Canvas camera={{ position: [0, 9, 12], fov: 50 }} gl={{ antialias: true }}>
+        <color attach="background" args={['#0f1419']} />
+        <ambientLight intensity={0.85} />
+        <directionalLight position={[-5, 9, 6]} intensity={1.05} />
         <mesh rotation-x={-Math.PI / 2} position={[0, -0.01, 0]}>
           <planeGeometry args={[20, 15]} />
-          <meshStandardMaterial color="#1a3a1a" />
+          <meshStandardMaterial color="#1a1f2e" roughness={0.95} />
         </mesh>
 
         {mappedPods.map((pod) => (
@@ -47,7 +48,7 @@ export default function Farm3D({ pods, onPodSelect }) {
             pod={pod}
             onPodSelect={(podId, position) => {
               setFocus(position)
-              onPodSelect?.(podId)
+              window.setTimeout(() => onPodSelect?.(podId), 420)
             }}
           />
         ))}

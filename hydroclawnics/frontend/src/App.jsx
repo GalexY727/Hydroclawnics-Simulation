@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
 import AgentLog from './AgentLog'
 import Farm3D from './Farm3D'
+import Navbar from './Navbar'
 import PhysicalPot from './PhysicalPot'
+import PodDetailModal from './PodDetailModal'
 import PodGrid from './PodGrid'
+import TabSwitcher from './tabSwitcher'
 import useWebSocket from './useWebSocket'
 
 export default function App() {
   const { pods, agentLog, connectionStatus } = useWebSocket()
   const [selectedPodId, setSelectedPodId] = useState('pod_01')
+  const [detailPodId, setDetailPodId] = useState(null)
   const [viewMode, setViewMode] = useState('grid')
 
   const podList = useMemo(() => Object.values(pods), [pods])
@@ -27,52 +31,36 @@ export default function App() {
     )
   }, [podList])
 
-  const statusStyles = {
-    connected: 'bg-emerald-400',
-    connecting: 'bg-amber-300',
-    disconnected: 'bg-rose-500',
+  const openPodDetail = (podId) => {
+    setSelectedPodId(podId)
+    setDetailPodId(podId)
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
-      <header className="mb-4 flex flex-col gap-3 border-b border-slate-800 pb-4 md:flex-row md:items-center md:justify-between">
-        <div className="text-2xl font-bold text-cyan-200">Hydroclawnics 🌿</div>
-        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
-          <div className="flex items-center gap-2 capitalize">
-            {/* # FIX: Expose live socket state in the navbar so proxy/backend failures are visible immediately. */}
-            <span className={`h-3 w-3 rounded-full ${statusStyles[connectionStatus]}`} />
-            {connectionStatus}
-          </div>
-          <div>
-            {healthSummary.healthy} healthy / {healthSummary.warning} warning / {healthSummary.critical} critical
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen xl:flex xl:h-screen xl:overflow-hidden" style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}>
+      <div className="flex min-h-screen w-full flex-col xl:min-h-0">
+      <Navbar connectionStatus={connectionStatus} healthSummary={healthSummary} />
 
-      <main className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]">
-        <section className="space-y-4">
+      <main className="grid gap-3 px-3 py-3 md:px-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,3fr)_minmax(340px,2fr)]">
+        <section className="flex min-h-0 flex-col gap-3">
           <PhysicalPot pods={pods} selectedPod={selectedPod} />
 
-          <div className="inline-flex overflow-hidden rounded-md border border-slate-700 bg-slate-900 p-1">
-            <button type="button" onClick={() => setViewMode('grid')} className={`rounded px-3 py-1.5 text-sm ${viewMode === 'grid' ? 'bg-cyan-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'}`}>
-              2D Grid
-            </button>
-            <button type="button" onClick={() => setViewMode('farm')} className={`rounded px-3 py-1.5 text-sm ${viewMode === 'farm' ? 'bg-cyan-500 text-slate-950' : 'text-slate-300 hover:bg-slate-800'}`}>
-              3D Farm
-            </button>
-          </div>
+          <TabSwitcher value={viewMode} onChange={setViewMode} />
 
           {viewMode === 'grid' ? (
-            <PodGrid pods={pods} onSelect={setSelectedPodId} />
+            <PodGrid pods={pods} onSelect={openPodDetail} />
           ) : (
-            <Farm3D pods={pods} onPodSelect={setSelectedPodId} />
+            <Farm3D pods={pods} onPodSelect={openPodDetail} />
           )}
         </section>
 
-        <section className="min-h-[720px]">
+        <section className="min-h-0">
           <AgentLog entries={agentLog} connectionStatus={connectionStatus} />
         </section>
       </main>
+
+      <PodDetailModal pod={detailPodId ? pods[detailPodId] : null} agentLog={agentLog} onClose={() => setDetailPodId(null)} />
+      </div>
     </div>
   )
 }
