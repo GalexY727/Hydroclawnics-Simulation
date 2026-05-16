@@ -9,20 +9,12 @@ export default function App() {
   const { pods, agentLog } = useWebSocket()
   const [selectedPodId, setSelectedPodId] = useState('pod_01')
   const [viewMode, setViewMode] = useState('grid')
+  const nextViewMode = viewMode === 'grid' ? 'farm' : 'grid'
 
   const selectedPod = useMemo(
     () => pods.find((p) => p.id === selectedPodId) || pods[0],
     [pods, selectedPodId],
   )
-
-  const histories = useMemo(() => {
-    const next = {}
-    for (const pod of pods) {
-      next[pod.id] = [...(window.__hydroHistory?.[pod.id] || []), { ph: pod.ph, ec_ppm: pod.ec_ppm }].slice(-20)
-    }
-    window.__hydroHistory = next
-    return next
-  }, [pods])
 
   return (
     <div className="min-h-screen p-4 md:p-6">
@@ -32,13 +24,13 @@ export default function App() {
           <PhysicalPot pod={selectedPod} />
 
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => viewMode === 'grid' ? setViewMode('farm') : setViewMode('grid')} className="rounded-md border border-slate-600 px-3 py-1 text-sm hover:bg-slate-800">
+            <button type="button" onClick={() => setViewMode(nextViewMode)} className="rounded-md border border-slate-600 px-3 py-1 text-sm hover:bg-slate-800">
               Switch to {viewMode === 'grid' ? '3D Farm' : '2D Pod Grid'}
             </button>
           </div>
 
           {viewMode === 'grid' ? (
-            <PodGrid pods={pods} histories={histories} onSelect={setSelectedPodId} />
+            <PodGrid pods={pods} onSelect={setSelectedPodId} />
           ) : (
             <Farm3D pods={pods} onPodSelect={setSelectedPodId} />
           )}

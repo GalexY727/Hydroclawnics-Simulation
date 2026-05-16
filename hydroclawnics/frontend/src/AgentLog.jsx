@@ -1,3 +1,5 @@
+const REASONING_PREVIEW_CHARS = 150
+
 function severityClass(entry) {
   const diagnosis = `${entry.diagnosis || ''}`.toLowerCase()
   if (diagnosis.includes('critical') || diagnosis.includes('crash') || diagnosis.includes('stress')) return 'border-rose-500'
@@ -16,7 +18,7 @@ export default function AgentLog({ entries }) {
             <div className="text-sm font-semibold">{entry.pod_id} · {entry.diagnosis}</div>
             <div className="text-sm text-slate-300">Action: {entry.action}</div>
             <p className="mt-1 text-xs text-slate-300">
-              <span className="typewriter">{`${entry.reasoning || ''}`.slice(0, 150)}</span>
+              <span className="typewriter">{`${entry.reasoning || ''}`.slice(0, REASONING_PREVIEW_CHARS)}</span>
             </p>
           </article>
         ))}

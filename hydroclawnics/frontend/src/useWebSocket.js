@@ -32,7 +32,7 @@ export default function useWebSocket() {
           if (message.type === 'agent_decision' && message.entry) {
             setAgentLog((prev) => [message.entry, ...prev].slice(0, 300))
           }
-        } catch (_err) {
+        } catch {
           // ignore malformed payloads
         }
       }

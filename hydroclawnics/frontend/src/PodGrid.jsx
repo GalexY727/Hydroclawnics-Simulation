@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Line,
   LineChart,
@@ -21,8 +21,19 @@ const cardTint = {
   critical: 'bg-rose-950/60 border-rose-700',
 }
 
-export default function PodGrid({ pods, histories, onSelect }) {
+export default function PodGrid({ pods, onSelect }) {
   const [active, setActive] = useState(null)
+  const [histories, setHistories] = useState({})
+
+  useEffect(() => {
+    setHistories((prev) => {
+      const next = {}
+      for (const pod of pods) {
+        next[pod.id] = [...(prev[pod.id] || []), { ph: pod.ph, ec_ppm: pod.ec_ppm }].slice(-20)
+      }
+      return next
+    })
+  }, [pods])
 
   const activeHistory = useMemo(() => {
     if (!active) return []
