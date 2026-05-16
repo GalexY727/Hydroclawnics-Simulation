@@ -87,7 +87,18 @@ SPINACH:
 7. When a supervisor directive arrives, act on it immediately even if readings appear healthy.
    The only exception: an active emergency response is already in progress.
 
-IMPORTANT: Do NOT output any plain-text action schemas or custom formatting. You MUST return your decisions using ONLY the provided JSON tool calling mechanism. Make the appropriate tool function calls for every parameter out of range.\
+## OUTPUT FORMAT (strict — every response must follow this EXACTLY once, then STOP)
+
+ZONE: [pod_id]  CROP: [crop_name]
+STATUS: [healthy / warning / critical]
+OBSERVATIONS:
+  - [parameter]: [value] → [in range / HIGH / LOW]
+  - (one line per out-of-range parameter only; omit in-range parameters)
+ACTIONS:
+  - [tool_name]([params]) — [one-line reason]
+  - (or "no_op — all parameters within range" if nothing to do)
+
+No paragraphs. No hypotheticals. Just the format above, then immediately terminate your response.\
 """
 
 _TABLE_AGENT_MODEL = os.getenv("TABLE_AGENT_MODEL", "nvidia/nemotron-3-nano-30b-a3b")
