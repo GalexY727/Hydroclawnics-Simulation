@@ -1,4 +1,4 @@
-import lettuceLogo from '../../../media/lettuce.png'
+import lettuceLogo from '../../../../../media/lettuce.png'
 
 const statusColor = {
   connected: 'var(--color-success)',

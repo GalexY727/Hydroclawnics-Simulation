@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import PodMesh from './PodMesh'
-import { deriveStage, deriveHealth } from './useFarm3D'
+import { deriveStage, deriveHealth } from '../../hooks/useFarm3D'
 
 function podIndexFromId(id) {
   if (!id) return 0
@@ -31,7 +31,7 @@ function PreviewScene({ pod }) {
       <PodMesh pod={mockMappedPod} podIndex={podIndex} preview />
       <OrbitControls
         autoRotate
-        autoRotateSpeed={3.5}
+        autoRotateSpeed={0.5}
         enableZoom={false}
         target={[0, 0.18, 0]}
       />

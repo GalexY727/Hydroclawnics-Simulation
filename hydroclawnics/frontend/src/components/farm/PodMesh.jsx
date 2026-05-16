@@ -2,7 +2,7 @@ import { useRef, useMemo } from 'react'
 import { Text } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { createPlantMesh, PLANT_TYPES } from './plantMesh'
+import { createPlantMesh, PLANT_TYPES } from '../../lib/plantMesh'
 
 export default function PodMesh({ pod, onPodSelect, podIndex = 0, preview = false }) {
   const plantRef = useRef()

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer } from 'recharts'
-import PlantPreview from './PlantPreview'
+import PlantPreview from '../farm/PlantPreview'
 
 const cropEmoji = {
   basil: '🌱',

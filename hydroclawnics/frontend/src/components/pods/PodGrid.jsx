@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import PhysicalPot from './PhysicalPot'
-import usePodGrid from './usePodGrid'
+import usePodGrid from '../../hooks/usePodGrid'
 
 const SORT_OPTIONS = [
   { value: 'status',     label: 'Status (critical first)' },
