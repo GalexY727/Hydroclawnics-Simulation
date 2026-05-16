@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
@@ -16,6 +17,7 @@ from simulator import SimulatorEngine, inject_fault
 
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIST = BASE_DIR / "frontend" / "dist"
+logger = logging.getLogger("hydroclawnics.websocket")
 
 
 class FaultRequest(BaseModel):
@@ -42,7 +44,13 @@ app.add_middleware(
 
 engine = SimulatorEngine()
 clients: set[WebSocket] = set()
+client_locks: dict[WebSocket, asyncio.Lock] = {}
 bridge_task: asyncio.Task | None = None
+
+
+def remove_client(client: WebSocket) -> None:
+    clients.discard(client)
+    client_locks.pop(client, None)
 
 
 async def broadcast(message: dict) -> None:
@@ -50,13 +58,15 @@ async def broadcast(message: dict) -> None:
         return
     stale: list[WebSocket] = []
     payload = json.dumps(message)
-    for client in clients:
+    for client in list(clients):
         try:
-            await client.send_text(payload)
+            # FIX: Serialize per-client sends so heartbeat and simulator broadcasts cannot race each other.
+            async with client_locks.setdefault(client, asyncio.Lock()):
+                await client.send_text(payload)
         except Exception:
             stale.append(client)
     for client in stale:
-        clients.discard(client)
+        remove_client(client)
 
 
 async def on_tick(pods_payload: list[dict]) -> None:
@@ -87,14 +97,53 @@ async def shutdown_event() -> None:
 async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
     clients.add(ws)
-    try:
-        await ws.send_json({"type": "pod_update", "pods": engine.snapshot()})
+    send_lock = asyncio.Lock()
+    client_locks[ws] = send_lock
+
+    async def heartbeat_loop() -> None:
         while True:
-            await ws.receive_text()
+            await asyncio.sleep(3)
+            # FIX: Send a periodic heartbeat so idle clients and proxies keep the socket open.
+            async with send_lock:
+                await ws.send_json({"type": "heartbeat"})
+
+    async def receive_loop() -> None:
+        while True:
+            raw_message = await ws.receive_text()
+            try:
+                json.loads(raw_message)
+            except json.JSONDecodeError:
+                logger.info("Ignoring non-JSON WebSocket message: %s", raw_message)
+
+    heartbeat_task: asyncio.Task | None = None
+    receive_task: asyncio.Task | None = None
+    try:
+        # FIX: Send initial data immediately, then keep independent heartbeat/receive loops alive.
+        async with send_lock:
+            await ws.send_json({"type": "pod_update", "pods": engine.snapshot()})
+        heartbeat_task = asyncio.create_task(heartbeat_loop(), name="websocket-heartbeat")
+        receive_task = asyncio.create_task(receive_loop(), name="websocket-receive")
+        done, pending = await asyncio.wait(
+            {heartbeat_task, receive_task},
+            return_when=asyncio.FIRST_EXCEPTION,
+        )
+        for task in pending:
+            task.cancel()
+        for task in done:
+            task.result()
     except WebSocketDisconnect:
-        clients.discard(ws)
+        logger.info("WebSocket client disconnected")
+        remove_client(ws)
     except Exception:
-        clients.discard(ws)
+        # FIX: Log unexpected handler failures instead of silently killing the WebSocket.
+        logger.exception("Unexpected WebSocket handler failure")
+        remove_client(ws)
+        raise
+    finally:
+        remove_client(ws)
+        for task in (heartbeat_task, receive_task):
+            if task and not task.done():
+                task.cancel()
 
 
 @app.get("/api/pods")

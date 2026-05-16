@@ -7,7 +7,8 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8000',
       '/ws': {
-        target: 'ws://localhost:8000',
+        // # FIX: Proxy the exact FastAPI /ws endpoint on port 8000 when the hook uses the Vite host.
+        target: 'http://localhost:8000',
         ws: true,
       },
     },

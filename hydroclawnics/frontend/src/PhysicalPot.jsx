@@ -1,73 +1,86 @@
-import Plot from 'react-plotly.js'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 
-function Gauge({ label, value, min, max, suffix, color }) {
+const statusClasses = {
+  healthy: 'border-emerald-500',
+  warning: 'border-amber-400',
+  critical: 'border-rose-500',
+}
+
+function Gauge({ label, value, min, max, suffix, color, greenZone }) {
+  const percentage = ((value - min) / (max - min)) * 100
+  const clampedPercentage = Math.max(0, Math.min(100, percentage))
+  
+  // Determine color based on green zone
+  let displayColor = color
+  if (value < greenZone[0] || value > greenZone[1]) {
+    displayColor = '#ef4444' // red for out of range
+  }
+
+  const data = [
+    { name: 'value', value: clampedPercentage },
+    { name: 'empty', value: 100 - clampedPercentage },
+  ]
+
   return (
-    <div className="rounded-lg bg-slate-950 p-1">
-      <Plot
-        data={[
-          {
-            type: 'indicator',
-            mode: 'gauge+number',
-            value,
-            number: { suffix },
-            title: { text: label },
-            gauge: {
-              axis: { range: [min, max] },
-              bar: { color },
-            },
-          },
-        ]}
-        layout={{
-          margin: { t: 30, b: 10, l: 10, r: 10 },
-          paper_bgcolor: '#020617',
-          font: { color: '#cbd5e1' },
-          height: 210,
-        }}
-        style={{ width: '100%', height: '210px' }}
-        useResizeHandler
-        config={{ displayModeBar: false }}
-      />
+    <div className="rounded bg-slate-950 p-4 flex flex-col items-center">
+      <ResponsiveContainer width="100%" height={180}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            startAngle={180}
+            endAngle={0}
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={0}
+            dataKey="value"
+          >
+            <Cell fill={displayColor} />
+            <Cell fill="#1f2937" />
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="text-center mt-2">
+        <p className="text-2xl font-semibold text-slate-100">
+          {value.toFixed(1)}{suffix}
+        </p>
+        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-xs text-slate-500 mt-1">
+          {min}-{max} ({greenZone[0]}-{greenZone[1]} ideal)
+        </p>
+      </div>
     </div>
   )
 }
 
-export default function PhysicalPot({ pod }) {
-  if (!pod) {
-    return null
-  }
-
-  const statusClasses = {
-    healthy: 'border-emerald-500',
-    warning: 'border-amber-400',
-    critical: 'border-rose-500',
-  }
+export default function PhysicalPot({ pods }) {
+  // # FIX: The physical pot is pinned to pod_00 when present, otherwise it follows the first live pod from FastAPI.
+  const pod = pods.pod_00 || Object.values(pods)[0]
 
   return (
-    <section className={`rounded-xl border-2 ${statusClasses[pod.status] || statusClasses.healthy} bg-slate-900 p-4`}>
-      <h2 className="text-xl font-semibold">Pot Alpha (Physical)</h2>
-      <p className="mb-3 text-sm text-slate-400">{pod.id} · {pod.crop}</p>
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className="rounded-lg bg-slate-800 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-400">pH</div>
-          <div className="text-2xl font-bold">{pod.ph.toFixed(2)}</div>
+    <section className={`border-2 ${statusClasses[pod?.status] || statusClasses.healthy} bg-slate-900 p-4`}>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-semibold">Pot Alpha (Physical)</h2>
+          <p className="text-sm text-slate-400">{pod ? `${pod.id} · ${pod.crop}` : 'Waiting for live pod data'}</p>
         </div>
-        <div className="rounded-lg bg-slate-800 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-400">EC</div>
-          <div className="text-2xl font-bold">{pod.ec_ppm.toFixed(0)} <span className="text-sm">ppm</span></div>
-        </div>
-        <div className="rounded-lg bg-slate-800 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-400">Temp</div>
-          <div className="text-2xl font-bold">{pod.temp_c.toFixed(1)} <span className="text-sm">°C</span></div>
-        </div>
+        {pod && <span className="rounded bg-slate-800 px-2 py-1 text-xs uppercase text-slate-300">{pod.status}</span>}
       </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <Gauge label="pH" value={pod.ph} min={3} max={8} suffix="" color="#38bdf8" />
-        <Gauge label="EC" value={pod.ec_ppm} min={300} max={1800} suffix=" ppm" color="#22c55e" />
-        <Gauge label="Temp" value={pod.temp_c} min={10} max={40} suffix="°C" color="#f97316" />
-      </div>
-      {pod.last_action ? (
-        <p className="mt-3 text-sm text-slate-300">Last action: {pod.last_action}</p>
-      ) : null}
+
+      {pod ? (
+        <div className="grid gap-3 lg:grid-cols-3">
+          <Gauge label="pH" value={pod.ph ?? 0} min={0} max={14} suffix="" color="#38bdf8" greenZone={[6, 7]} />
+          <Gauge label="EC ppm" value={(pod.ec_ppm ?? 0) / 1000} min={0} max={3} suffix="" color="#22c55e" greenZone={[0.8, 1.6]} />
+          <Gauge label="Temp °C" value={pod.temp_c ?? 0} min={10} max={35} suffix="°C" color="#f97316" greenZone={[18, 24]} />
+        </div>
+      ) : (
+        <div className="flex items-center justify-center rounded bg-slate-800 py-12 text-slate-400">No sensor data available</div>
+      )}
+
+      <p className="mt-3 text-sm italic text-slate-400">
+        Last action: {pod?.last_action || 'No physical intervention logged yet.'}
+      </p>
     </section>
   )
 }

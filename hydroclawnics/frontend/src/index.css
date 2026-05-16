@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  @apply text-slate-100 antialiased;
+  background: #07130e;
 }
 
 #root {
@@ -13,10 +14,16 @@ body {
 .typewriter {
   display: inline-block;
   overflow: hidden;
-  white-space: nowrap;
+  vertical-align: bottom;
+  white-space: normal;
   border-right: 1px solid rgba(148, 163, 184, 0.6);
+  /* # FIX: Keep the newest reasoning animation from forcing long text onto one overflowing line. */
   animation: typewriter 2.8s steps(60, end) forwards, blink 900ms step-end infinite;
   max-width: 0;
+}
+
+.subtle-pulse {
+  animation: subtle-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes typewriter {
@@ -31,5 +38,15 @@ body {
 @keyframes blink {
   50% {
     border-color: transparent;
+  }
+}
+
+@keyframes subtle-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
   }
 }
