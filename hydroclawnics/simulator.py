@@ -169,6 +169,9 @@ class SimulatorEngine:
         SENSORS_FILE.parent.mkdir(parents=True, exist_ok=True)
         while self._running:
             for pod in self.pods:
+                # Skip simulating pod_001 as it uses an actual sensor
+                if pod.id == "pod_001":
+                    continue
                 tick(pod, dt=5.0)
             payload = self.snapshot()
             SENSORS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")

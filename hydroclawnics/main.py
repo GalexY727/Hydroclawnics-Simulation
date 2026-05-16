@@ -41,6 +41,13 @@ class ThoughtRequest(BaseModel):
     ts: str
 
 
+class SensorDataRequest(BaseModel):
+    ph: float
+    ec_ppm: float
+    temp_c: float
+    light_lux: float
+
+
 app = FastAPI(title="Hydroclawnics")
 app.add_middleware(
     CORSMiddleware,
@@ -241,6 +248,25 @@ async def post_fault(pod_id: str, body: FaultRequest) -> dict:
             inject_fault(pod, body.fault)
             await _publish_engine_snapshot()
             return {"ok": True, "pod": pod_id, "fault": body.fault}
+    raise HTTPException(status_code=404, detail="Pod not found")
+
+
+@app.post("/api/sensor_data/{pod_id}")
+async def post_sensor_data(pod_id: str, body: SensorDataRequest) -> dict:
+    from simulator import compute_status
+    for pod in engine.pods:
+        if pod.id == pod_id:
+            pod.ph = body.ph
+            pod.ec_ppm = body.ec_ppm
+            pod.temp_c = body.temp_c
+            pod.light_lux = body.light_lux
+            pod.status = compute_status(pod)
+            
+            payload = engine.snapshot()
+            SENSORS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            SENSORS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            await broadcast({"type": "pod_update", "pods": payload})
+            return {"ok": True, "pod": pod_id}
     raise HTTPException(status_code=404, detail="Pod not found")
 
 
