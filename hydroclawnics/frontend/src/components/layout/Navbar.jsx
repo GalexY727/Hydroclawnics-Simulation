@@ -25,7 +25,11 @@ export default function Navbar({ connectionStatus, healthSummary, tab, onTabChan
           <img src={lettuceLogo} alt="" className="h-full w-full object-contain" />
         </div>
         <span className="hidden text-base font-semibold tracking-[-0.8px] sm:block" style={{ color: 'var(--color-text)' }}>
-          Hydroclawnics
+          Hydro
+            <span style={{ background: 'linear-gradient(135deg, #ff69b4, #ff1493, #ff69b4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                claw
+            </span>
+          nics
         </span>
       </div>
 
