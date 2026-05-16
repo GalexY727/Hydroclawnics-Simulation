@@ -75,7 +75,7 @@ export default function PhysicalPot({ pods }) {
         <div className="grid gap-3 lg:grid-cols-3">
           <MetricRow label="pH" value={pod.ph} displayValue={formatNumber(pod.ph, 2)} rangeText="[range 6.0-7.0]" range={metricRanges.ph} />
           <MetricRow label="EC" value={ecMs} displayValue={`${formatNumber(ecMs, 1)} ppm`} rangeText="[range 0.8-1.2]" range={metricRanges.ec} accent="var(--color-info)" />
-          <MetricRow label="Temp" value={pod.temp_c} displayValue={`${formatNumber(pod.temp_c, 0)}°C`} rangeText="[range 18-24]" range={metricRanges.temp} accent="var(--color-warning)" />
+          <MetricRow label="Temp" value={pod.water_temp_c} displayValue={`${formatNumber(pod.water_temp_c, 0)}°C`} rangeText="[range 18-24]" range={metricRanges.temp} accent="var(--color-warning)" />
         </div>
       ) : (
         <div className="flex min-h-32 items-center justify-center rounded-md border text-sm italic" style={{ borderColor: 'var(--color-border)', color: 'var(--color-muted)' }}>
