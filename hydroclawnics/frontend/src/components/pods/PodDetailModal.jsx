@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react'
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import PlantPreview from '../farm/PlantPreview'
 
 const cropEmoji = {
   basil: '🌱',
   lettuce: '🥬',
   spinach: '🍃',
+  tomato: '🍅',
 }
 
 const statusStyles = {
@@ -37,6 +38,18 @@ function formatReading(value, digits = 1) {
   return numeric.toFixed(digits)
 }
 
+function formatMetric(value, suffix = '', digits = 1) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  return `${numeric.toFixed(digits)}${suffix}`
+}
+
+function formatWholeMetric(value, suffix = '') {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  return `${Math.round(numeric)}${suffix}`
+}
+
 function formatTime(timestamp) {
   const date = timestamp ? new Date(timestamp) : null
   if (!date || Number.isNaN(date.getTime())) return '--:--'
@@ -52,22 +65,32 @@ function formatRelativeSeconds(seconds) {
 function StatusBadge({ status }) {
   const normalized = status || 'healthy'
   return (
-    <span className="rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-[0.02em]" style={statusStyles[normalized] || statusStyles.healthy}>
+    <span className="rounded-md px-2 py-1 text-[11px] font-medium uppercase tracking-[0.02em]" style={statusStyles[normalized] || statusStyles.healthy}>
       {normalized}
     </span>
   )
 }
 
+function MetricValue({ value }) {
+  const hasValue = value !== null && value !== undefined && value !== '--'
+  return (
+    <div
+      className={`min-w-0 truncate text-m leading-6 [font-feature-settings:'tnum'] ${hasValue ? 'font-medium' : 'font-light'}`}
+      style={{ color: hasValue ? 'var(--color-text)' : 'var(--color-muted)' }}
+    >
+      {hasValue ? value : '—'}
+    </div>
+  )
+}
+
 function CompactMetric({ label, value, dotColor }) {
   return (
-    <div className="min-w-0 rounded-md border px-3 py-2" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
-      <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.02em]" style={{ color: 'var(--color-muted)' }}>
-        {dotColor ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} /> : null}
+    <div className="min-w-0 rounded-md border px-3 py-2.5" style={{ borderColor: 'var(--color-border)', background: 'rgba(15, 20, 25, 0.72)' }}>
+      <div className="mb-1.5 flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.02em]" style={{ color: 'var(--color-muted)' }}>
+        {dotColor ? <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor }} aria-hidden="true" /> : null}
         <span className="truncate">{label}</span>
       </div>
-      <div className="truncate font-mono text-sm font-bold" style={{ color: 'var(--color-text)' }}>
-        {value}
-      </div>
+      <MetricValue value={value} />
     </div>
   )
 }
@@ -76,14 +99,14 @@ function SparklinePanel({ title, dataKey, data, stroke, label, digits = 0 }) {
   return (
     <div className="min-h-0">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div className="truncate text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
+        <div className="truncate text-xs font-medium" style={{ color: 'var(--color-text)' }}>
           {title}
         </div>
       </div>
-      <div className="h-[138px] rounded-md border p-2" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
+      <div className="h-40 rounded-md border p-2" style={{ borderColor: 'var(--color-border)', background: 'rgba(15, 20, 25, 0.68)' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 4, right: 10, bottom: 0, left: 6 }}>
-            <CartesianGrid stroke="rgba(127, 176, 105, 0.08)" vertical={false} />
+          <LineChart data={data} margin={{ top: 6, right: 10, bottom: 0, left: 4 }}>
+            <CartesianGrid stroke="rgba(168, 164, 158, 0.08)" vertical={false} />
             <XAxis
               dataKey="secondsFromLatest"
               type="number"
@@ -113,13 +136,6 @@ function SparklinePanel({ title, dataKey, data, stroke, label, digits = 0 }) {
                 fontSize: 11,
               }}
             />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={20}
-              iconType="plainline"
-              wrapperStyle={{ color: 'var(--color-muted)', fontSize: 10 }}
-            />
             <Line
               type="monotone"
               name={label}
@@ -138,39 +154,44 @@ function SparklinePanel({ title, dataKey, data, stroke, label, digits = 0 }) {
 }
 
 function AgentReasoningPanel({ entries }) {
+  const isActive = entries.length > 0
+
   return (
-    <aside className="flex min-h-0 flex-col rounded-md border p-4" style={{ borderColor: 'var(--color-border)', background: 'var(--color-bg)' }}>
-      <div className="mb-3 shrink-0">
-        <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-          Agent Reasoning
-        </h3>
-        <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
-          Decisions for this plant
-        </p>
+    <aside className="flex min-h-0 flex-1 flex-col rounded-md border p-4" style={{ borderColor: 'var(--color-border)', background: 'rgba(15, 20, 25, 0.58)' }}>
+      <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium" style={{ color: 'var(--color-text)' }}>
+            Agent Reasoning
+          </h3>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-muted)' }}>
+            Decisions for this pod
+          </p>
+        </div>
+        <span
+          className={`mt-1 h-2 w-2 shrink-0 rounded-full ${isActive ? 'connection-dot' : ''}`}
+          style={{ background: isActive ? 'var(--color-success)' : 'var(--color-muted)', opacity: isActive ? 1 : 0.45 }}
+          aria-hidden="true"
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {entries.length === 0 ? (
           <div className="flex h-full min-h-40 items-center justify-center text-center text-xs italic" style={{ color: 'var(--color-muted)' }}>
-            No agent reasoning recorded for this pod yet.
+            Waiting for agent cycle...
           </div>
         ) : (
           entries.map((entry, idx) => (
-            <article key={`${entry.timestamp}-${entry.action}-${idx}`} className="border-b py-3 first:pt-0 last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
+            <article key={`${entry.timestamp}-${entry.action}-${idx}`} className="border-b py-3 first:pt-0 last:border-b-0" style={{ borderColor: 'rgba(61, 68, 81, 0.72)' }}>
               <div className="mb-1.5 flex items-center gap-2 text-xs" style={{ color: 'var(--color-muted)' }}>
                 <span>{formatTime(entry.timestamp)}</span>
-                <span className="h-1 w-1 rounded-full" style={{ background: 'var(--color-muted)' }} />
-                <span>{entry.pod_id || 'pod'}</span>
               </div>
-              <div className="text-sm font-bold leading-5" style={{ color: 'var(--color-text)' }}>
-                {entry.diagnosis || 'Decision received'}
+              <div className="truncate text-sm font-medium leading-5" style={{ color: 'var(--color-text)' }}>
+                {entry.action || entry.diagnosis || 'Decision received'}
               </div>
-              <div className="mt-1 truncate font-mono text-xs" style={{ color: colorForAction(entry.action) }}>
-                {entry.action || 'observe'}
-              </div>
-              <p className="mt-2 text-xs leading-5" style={{ color: 'var(--color-muted)' }}>
-                {entry.reasoning || 'No reasoning supplied.'}
+              <p className="mt-1 line-clamp-3 text-xs leading-5" style={{ color: 'var(--color-muted)' }}>
+                {entry.reasoning || entry.diagnosis || 'No reasoning supplied.'}
               </p>
+              {entry.action ? <div className="mt-2 h-0.5 w-8 rounded-full" style={{ background: colorForAction(entry.action) }} aria-hidden="true" /> : null}
             </article>
           ))
         )}
@@ -213,66 +234,90 @@ export default function PodDetailModal({ pod, agentLog = [], onClose }) {
     return null
   }
 
+  const ageHours = Number(pod.age_hours || 0)
+  const formattedAge = `${Math.floor(ageHours)}h ${Math.round((ageHours % 1) * 60)}m`
+  const faultSummary = pod.fault_type && pod.fault_type !== 'none' ? pod.fault_type : 'No active fault'
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center p-3 md:p-5" style={{ background: 'var(--color-overlay)' }} onMouseDown={onClose}>
       <section
-        className="modal-enter flex max-h-[92vh] w-full max-w-[1180px] flex-col overflow-hidden rounded-lg border p-4 md:h-[86vh] md:max-h-[760px] md:p-5"
+        className="modal-enter flex max-h-[92vh] w-[95vw] max-w-[900px] flex-col overflow-hidden rounded-lg border"
         style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="pod-detail-title"
       >
-        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="mb-1.5 flex flex-wrap items-center gap-3">
-              <h2 id="pod-detail-title" className="truncate text-xl font-semibold tracking-[-0.2px]" style={{ color: 'var(--color-text)' }}>
+        <div className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b px-4 py-3" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+              <h2 id="pod-detail-title" className="truncate text-xl font-medium" style={{ color: 'var(--color-text)' }}>
                 {pod.id} {cropEmoji[pod.crop] || '🌱'} {pod.crop}
               </h2>
               <StatusBadge status={pod.status} />
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--color-muted)' }}>
-              <span>{pod.fault_type && pod.fault_type !== 'none' ? `Fault: ${pod.fault_type}` : 'No active fault'}</span>
-              <span>Updated {formatTime(pod.timestamp)}</span>
+            <div className="text-xs" style={{ color: 'var(--color-muted)' }}>
+              Updated {formatTime(pod.timestamp)}
             </div>
           </div>
-          <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded-md transition-colors hover:bg-[color:var(--color-hover)]" onClick={onClose} aria-label="Close pod detail">
-            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
+          <div className="flex min-w-0 shrink-0 items-center gap-3">
+            <div className="hidden max-w-56 truncate text-right text-xs sm:block" style={{ color: 'var(--color-muted)' }}>
+              {faultSummary}
+            </div>
+            <button type="button" className="grid h-9 w-9 shrink-0 place-items-center rounded-md transition-colors hover:bg-[color:var(--color-hover)]" onClick={onClose} aria-label="Close pod detail">
+              <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px] lg:overflow-hidden xl:grid-cols-[minmax(0,1fr)_350px]">
-          <div className="min-h-0 overflow-visible lg:overflow-hidden">
-            <div className="grid gap-4 xl:grid-cols-[250px_minmax(0,1fr)]">
-              <div className="min-w-0">
-                <PlantPreview pod={pod} className="mb-0 aspect-square h-auto min-h-[220px] w-full xl:min-h-0" />
-              </div>
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(280px,2fr)] grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-y-auto p-4 max-[700px]:grid-cols-1 max-[700px]:grid-rows-none">
+          <section className="col-start-2 row-start-1 rounded-md border p-3 max-[700px]:col-start-1 max-[700px]:row-start-1" style={{ borderColor: 'var(--color-border)', background: 'rgba(15, 20, 25, 0.42)' }}>
+            <PlantPreview pod={pod} className="mb-2 h-[280px] w-full" />
+            <div className="text-center text-xs" style={{ color: 'var(--color-muted)' }}>
+              {pod.id}
+            </div>
+          </section>
 
+          <div className="col-start-1 row-span-2 row-start-1 min-h-0 min-w-0 space-y-4 max-[700px]:row-span-1 max-[700px]:row-start-2">
+            <section>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.02em]" style={{ color: 'var(--color-muted)' }}>
+                Key Vitals
+              </h3>
+              <div className="grid grid-cols-3 gap-2 max-[520px]:grid-cols-2">
+                <CompactMetric label="pH" value={formatMetric(pod.ph, '', 2)} />
+                <CompactMetric label="Temp" value={formatMetric(pod.water_temp_c, ' deg C', 1)} />
+                <CompactMetric label="EC" value={formatWholeMetric(pod.ec_ppm, ' ppm')} />
+                <CompactMetric label="Water" value={formatWholeMetric(pod.water_level, '%')} />
+                <CompactMetric label="Humidity" value={formatWholeMetric(pod.humidity, '%')} />
+                <CompactMetric label="DO" value={formatMetric(pod.do_mg_l, ' mg/L', 1)} />
+                <CompactMetric label="Pump" value={pod.pump_status ? 'On' : 'Off'} dotColor={statusDotStyles[pod.pump_status ? 'on' : 'off']} />
+                <CompactMetric label="Flow" value={formatMetric(pod.flow_rate, ' L/m', 1)} />
+                <CompactMetric label="Height" value={formatMetric(pod.plant_height_cm, ' cm', 1)} />
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 text-xs font-medium uppercase tracking-[0.02em]" style={{ color: 'var(--color-muted)' }}>
+                Trend Charts
+              </h3>
               <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                 <SparklinePanel title="pH" data={chartData} dataKey="ph" label="pH" digits={2} stroke="var(--color-success)" />
                 <SparklinePanel title="EC" data={chartData} dataKey="ec_ppm" label="ppm" stroke="var(--color-warning)" />
                 <SparklinePanel title="Temp" data={chartData} dataKey="water_temp_c" label="deg C" digits={1} stroke="var(--color-info)" />
                 <SparklinePanel title="Light" data={chartData} dataKey="light_lux" label="lux" stroke="#d7c96b" />
               </div>
-            </div>
+            </section>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-5">
-              <CompactMetric label="DO" value={pod.do_mg_l ? `${formatReading(pod.do_mg_l, 1)} mg/L` : '--'} />
-              <CompactMetric label="Age" value={`${Math.floor(Number(pod.age_hours || 0))}h ${Math.round((Number(pod.age_hours || 0) % 1) * 60)}m`} />
-              <CompactMetric label="Height" value={`${formatReading(pod.plant_height_cm, 1)} cm`} />
-              <CompactMetric label="Water" value={pod.water_level != null ? `${Math.round(Number(pod.water_level))}%` : '--'} />
-              <CompactMetric label="Humidity" value={pod.humidity != null ? `${Math.round(Number(pod.humidity))}%` : '--'} />
-              <CompactMetric label="Pump" value={pod.pump_status ? 'On' : 'Off'} dotColor={statusDotStyles[pod.pump_status ? 'on' : 'off']} />
-              <CompactMetric label="Flow" value={pod.flow_rate != null ? `${Number(pod.flow_rate).toFixed(1)} L/m` : '--'} />
-              <CompactMetric label="Air" value={pod.air_temp_c != null ? `${formatReading(pod.air_temp_c, 1)} deg C` : '--'} />
-              <CompactMetric label="Status" value={pod.status || 'healthy'} dotColor={statusDotStyles[pod.status] || statusDotStyles.healthy} />
-              <CompactMetric label="Crop" value={pod.crop || '--'} />
+            <div className="truncate rounded-md border px-3 py-2 text-xs uppercase tracking-[0.02em]" style={{ borderColor: 'var(--color-border)', background: 'rgba(15, 20, 25, 0.4)', color: 'var(--color-muted)' }}>
+              AGE: {formattedAge} &nbsp;·&nbsp; HEIGHT: {formatMetric(pod.plant_height_cm, ' cm', 1) || '—'} &nbsp;·&nbsp; CROP: {pod.crop || '—'} &nbsp;·&nbsp; AIR: {formatMetric(pod.air_temp_c, ' deg C', 1) || '—'}
             </div>
           </div>
 
-          <AgentReasoningPanel entries={podAgentEntries} />
+          <div className="col-start-2 row-start-2 flex min-h-0 min-w-0 max-[700px]:col-start-1 max-[700px]:row-start-3">
+            <AgentReasoningPanel entries={podAgentEntries} />
+          </div>
         </div>
       </section>
     </div>
