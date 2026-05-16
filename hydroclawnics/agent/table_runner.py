@@ -235,6 +235,9 @@ def parse_agent_response(response_text: str) -> dict:
                                     params[k] = float(v)
                                 except ValueError:
                                     params[k] = v
+                        elif segment:
+                            # If it's a positional argument and looks like a pod or zone ID
+                            params["pod_id"] = segment
                     result["actions"].append({"tool": tool_name, "params": params, "reason": reason})
 
         return result
