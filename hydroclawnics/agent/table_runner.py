@@ -355,6 +355,35 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
             parsed = parse_agent_response(reasoning_text)
             if parsed.get("status") not in ("healthy", "warning", "critical"):
                 parsed["status"] = reading.status
+
+            # Model returned text instead of function calls — execute parsed actions now
+            for act in parsed.get("actions", []):
+                tool_name = act.get("tool", "")
+                if not tool_name or tool_name == "no_op":
+                    continue
+                params = dict(act.get("params") or {})
+                params.setdefault("zone_id", table_id)
+                result = execute_tool(tool_name, params)
+                action = alog.sanitize_action({
+                    "zone_id": table_id,
+                    "pod_id": params.get("pod_id") or table_id,
+                    "tool": tool_name,
+                    "params": params,
+                    "result": result,
+                    "reason": act.get("reason") or reasoning_text or "",
+                    "status": parsed.get("status") or reading.status,
+                    "cycle_id": cycle_id,
+                })
+                alog.log(
+                    agent_type="table",
+                    table_id=table_id,
+                    tool=action["tool"],
+                    params=action["params"],
+                    result=result,
+                    reasoning=action["reason"] or None,
+                )
+                actions_taken.append(action)
+                logger.info("[%s] Executed text-parsed action: %s %s", table_id, tool_name, params)
     cycle_ms = int((time.monotonic() - cycle_start) * 1000)
     effective_status = parsed.get("status") or reading.status
     observation_summary = "all parameters within range"
