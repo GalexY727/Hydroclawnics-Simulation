@@ -20,8 +20,22 @@ hydroclawnics/
 
 ## Backend (dev)
 
+Windows:
 ```bash
 cd hydroclawnics
+# create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\Activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Mac/Linux:
+```bash
+cd hydroclawnics
+# create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload
 ```

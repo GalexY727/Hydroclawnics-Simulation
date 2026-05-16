@@ -18,7 +18,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen p-4 md:p-6">
-      <header className="mb-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-2xl font-bold text-cyan-300">HydroClaw</header>
+      <header className="mb-4 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-2xl font-bold text-cyan-300">Hydroclawnics</header>
       <main className="grid gap-4 xl:grid-cols-5">
         <section className="space-y-4 xl:col-span-3">
           <PhysicalPot pod={selectedPod} />
