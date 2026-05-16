@@ -13,6 +13,6 @@ jobs:
           BREV_API_KEY: ${{ secrets.BREV_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
-          curl -fsSL https://raw.githubusercontent.com/brevdev/brev-cli/main/bin/install-latest.sh | sudo bash
-          /root/.local/bin/brev login --api-key $BREV_API_KEY
-          /root/.local/bin/brev exec hydroclawnics -- "cd /home/ubuntu/Hydroclawnics-Simulation && git pull origin main && NVIDIA_API_KEY=$NVIDIA_API_KEY bash deploy.sh"
+          curl -fsSL https://raw.githubusercontent.com/brevdev/brev-cli/main/bin/install-latest.sh | bash
+          ~/.local/bin/brev login --api-key $BREV_API_KEY
+          ~/.local/bin/brev exec hydroclawnics -- "cd /home/ubuntu/Hydroclawnics-Simulation && git pull origin main && NVIDIA_API_KEY=$NVIDIA_API_KEY bash deploy.sh"
