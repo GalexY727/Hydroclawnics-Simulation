@@ -23,7 +23,7 @@ export function getHealthColor(stage, health) {
   const base = new THREE.Color(STAGE_COLORS[stage ?? 1] ?? STAGE_COLORS[1])
   if (h < 0.4) return base.lerp(new THREE.Color('#c47a7a'), 0.7)
   if (h <= 0.7) return base.lerp(new THREE.Color('#c8a84b'), 0.4)
-  return base
+  return base.clone()
 }
 
 function _getMaterial(stage, health) {
@@ -65,8 +65,8 @@ export function createPlantMesh(stage = 1, health = 0.8) {
     const stemTop = 0.08 + stemH
 
     const leafOffsets = [
-      { sign: -1, rx: 0, rz:  35 * (Math.PI / 180) },
-      { sign:  1, rx: 0, rz: -35 * (Math.PI / 180) },
+      { sign: -1, rz:  35 * (Math.PI / 180) },
+      { sign:  1, rz: -35 * (Math.PI / 180) },
     ]
     for (const { sign, rz } of leafOffsets) {
       const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), mat)
