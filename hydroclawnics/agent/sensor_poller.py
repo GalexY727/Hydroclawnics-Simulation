@@ -9,6 +9,8 @@ from . import sim_bridge
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SENSORS_FILE = BASE_DIR / "sensors" / "pod_states.json"
+PODS_PER_TABLE = max(1, int(os.getenv("PODS_PER_TABLE", "100")))
+
 
 
 @dataclass
@@ -24,6 +26,7 @@ class SensorReading:
     healthy_count: int
     status: str
     fault_types: list[str]
+    pods: list[dict] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
@@ -62,6 +65,7 @@ def read_all() -> dict[str, SensorReading]:
             healthy_count=healthy,
             status=status,
             fault_types=faults,
+            pods=table_pods,
         )
 
     return readings

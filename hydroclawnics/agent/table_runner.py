@@ -5,7 +5,10 @@ import asyncio
 import json
 import logging
 import os
+import re
+import time
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from openai import AsyncOpenAI
 
@@ -111,40 +114,136 @@ def _build_prompt(
     zone_state = sim_bridge.get_sensor_state(table_id)
     humidity = zone_state.get("humidity_pct", "N/A")
     water_level = zone_state.get("water_level", "N/A")
+    water_temp_c = zone_state.get("water_temp_c", zone_state.get("temp_c", "N/A"))
+    pump_status = "on" if zone_state.get("fan_on") else "off"
+    zone_ts = zone_state.get("timestamp", datetime.now(timezone.utc).isoformat())
 
     lines = [
-        f"## Zone {table_id} ({crop.upper()}) Sensor Report",
-        f"Status: **{reading.status.upper()}**",
-        f"Pods: {', '.join(reading.pod_ids)}",
-        f"air_temp_c: {reading.avg_temp_c}°C | ph: {reading.avg_ph} | "
-        f"ec_ppm: {reading.avg_ec_ppm} | light_lux: {reading.avg_light_lux}",
-        f"humidity_%: {humidity} | water_level_%: {water_level}",
-        f"Health: {reading.healthy_count} healthy, "
-        f"{reading.warning_count} warning, {reading.critical_count} critical",
+        f"## Zone {table_id} ({crop.upper()}) — Status: {reading.status.upper()}",
+        (
+            f"Zone: air_temp_c={reading.avg_temp_c}°C | water_temp_c={water_temp_c}°C | "
+            f"relative_humidity_percent={humidity} | water_level_percent={water_level} | "
+            f"pump_status={pump_status} | flow_rate_l_min=N/A"
+        ),
+        f"Avg: ph={reading.avg_ph} | ec_ppm={reading.avg_ec_ppm} | light_lux={reading.avg_light_lux}",
+        f"Health: {reading.healthy_count} ok / {reading.warning_count} warn / {reading.critical_count} crit",
     ]
+
     if reading.fault_types:
-        lines.append(f"Active faults: {', '.join(reading.fault_types)}")
+        lines.append(f"Faults: {', '.join(reading.fault_types)}")
+
+    if reading.pods:
+        lines.append(
+            "\nPod data (id | crop | plant_status | fault_type | ph | ec_ppm | "
+            "air_temp_c | light_lux | age_hours | plant_height_cm | timestamp):"
+        )
+        for pod in reading.pods:
+            age_h = round(pod.get("age_hours", 0.0), 1)
+            plant_h_cm = round(age_h * 0.05, 1)
+            lines.append(
+                f"  {pod.get('id','?')} | {pod.get('crop', crop)} | "
+                f"{pod.get('status','?')} | {pod.get('fault_type','none')} | "
+                f"ph={pod.get('ph','?')} | ec={pod.get('ec_ppm','?')} | "
+                f"air_temp={pod.get('temp_c','?')}°C | lux={pod.get('light_lux','?')} | "
+                f"age={age_h}h | height={plant_h_cm}cm | {zone_ts}"
+            )
 
     if directives:
-        lines.append("\n## PENDING SUPERVISOR DIRECTIVES — YOU MUST ACT ON THESE")
+        lines.append("\n## PENDING SUPERVISOR DIRECTIVES — ACT ON THESE NOW")
         for d in directives:
             lines.append(
                 f"- [{d.get('priority', 'normal').upper()}] "
                 f"{d.get('action', '')}: {d.get('reasoning', '')}"
             )
         lines.append(
-            "\nThe supervisor has issued the above directive(s). "
-            "Call the appropriate tool(s) to carry them out, then confirm completion."
+            "\nCall the appropriate tool(s) to carry out the directive(s), then confirm."
         )
     else:
         lines.append(
-            "\nCheck all parameters against the target ranges for "
-            f"{crop.upper()}. Call tools to correct any issues, or report no_op if healthy."
+            f"\nCheck all parameters vs {crop.upper()} targets. "
+            "Call tools to fix issues, or no_op if all in range."
         )
+
     return "\n".join(lines)
 
 
+def parse_agent_response(response_text: str) -> dict:
+    """Parse the structured text output from the table agent.
+
+    Expected format:
+        ZONE: [zone_id]  CROP: [crop_name]
+        STATUS: [healthy/warning/critical]
+        OBSERVATIONS:
+          - [param]: [value] → [in range / HIGH / LOW]
+        ACTIONS:
+          - [tool_name]([params]) — [reason]
+
+    Returns a structured dict, or a safe default on parse failure.
+    """
+    default: dict = {"zone_id": "unknown", "status": "unknown", "observations": [], "actions": []}
+    if not response_text:
+        return default
+    try:
+        result: dict = {"zone_id": "unknown", "status": "unknown", "observations": [], "actions": []}
+
+        m = re.search(r"ZONE:\s*(\S+)", response_text, re.IGNORECASE)
+        if m:
+            result["zone_id"] = m.group(1).rstrip(",").strip()
+
+        m = re.search(r"STATUS:\s*(\w+)", response_text, re.IGNORECASE)
+        if m:
+            result["status"] = m.group(1).lower()
+
+        obs_m = re.search(r"OBSERVATIONS:(.*?)(?:ACTIONS:|$)", response_text, re.DOTALL | re.IGNORECASE)
+        if obs_m:
+            for line in obs_m.group(1).splitlines():
+                line = line.strip().lstrip("-").strip()
+                if not line:
+                    continue
+                # param: value → flag
+                parts = re.match(r"([^:]+):\s*([^→\-]+)[→\-]+\s*(.+)", line)
+                if parts:
+                    result["observations"].append({
+                        "param": parts.group(1).strip(),
+                        "value": parts.group(2).strip(),
+                        "flag": parts.group(3).strip(),
+                    })
+
+        act_m = re.search(r"ACTIONS:(.*?)$", response_text, re.DOTALL | re.IGNORECASE)
+        if act_m:
+            for line in act_m.group(1).splitlines():
+                line = line.strip().lstrip("-").strip()
+                if not line or line.lower().startswith("no_op"):
+                    continue
+                # tool_name(params) — reason
+                parts = re.match(r"(\w+)\(([^)]*)\)\s*[—\-]+\s*(.+)", line)
+                if parts:
+                    tool_name = parts.group(1).strip()
+                    params_str = parts.group(2).strip()
+                    reason = parts.group(3).strip()
+                    params: dict = {}
+                    for segment in params_str.split(","):
+                        segment = segment.strip()
+                        if "=" in segment:
+                            k, v = segment.split("=", 1)
+                            k, v = k.strip(), v.strip()
+                            try:
+                                params[k] = int(v)
+                            except ValueError:
+                                try:
+                                    params[k] = float(v)
+                                except ValueError:
+                                    params[k] = v
+                    result["actions"].append({"tool": tool_name, "params": params, "reason": reason})
+
+        return result
+    except Exception as exc:
+        logger.warning("parse_agent_response failed (%s) | raw: %.200s", exc, response_text)
+        return default
+
+
 async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
+    cycle_start = time.monotonic()
     reading = sensor_poller.read_table(table_id)
     if reading is None:
         logger.warning("No sensor data available for %s — skipping cycle", table_id)
@@ -161,6 +260,7 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
     tools = as_openai_tools()
     actions_taken: list[dict] = []
     reasoning_text = ""
+    cycle_id = str(uuid4())
 
     for _ in range(5):  # max 5 agentic rounds
         response = await client.chat.completions.create(
@@ -171,6 +271,10 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
             temperature=0.3,
             max_tokens=1024,
         )
+        if response.choices[0].finish_reason == "length":
+            logger.warning("[%s] API truncated response (finish_reason=length)", table_id)
+            reasoning_text = ""
+            break
         msg = response.choices[0].message
         assistant_msg: dict = {"role": "assistant"}
         if msg.content is not None:
@@ -198,16 +302,26 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
             params.setdefault("zone_id", table_id)
 
             result = execute_tool(tc.function.name, params)
-            entry = alog.log(
+            action = alog.sanitize_action({
+                "zone_id": table_id,
+                "pod_id": params.get("pod_id") or table_id,
+                "tool": tc.function.name,
+                "params": params,
+                "result": result,
+                "reason": reasoning_text or "",
+                "status": reading.status,
+                "cycle_id": cycle_id,
+            })
+            # Log each tool call for detailed audit trail
+            alog.log(
                 agent_type="table",
                 table_id=table_id,
-                tool=tc.function.name,
-                params=params,
+                tool=action["tool"],
+                params=action["params"],
                 result=result,
-                reasoning=reasoning_text or None,
+                reasoning=action["reason"] or None,
             )
-            asyncio.create_task(alog.broadcast_action(entry))
-            actions_taken.append({"tool": tc.function.name, "params": params, "result": result})
+            actions_taken.append(action)
             tool_results.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -216,11 +330,63 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
 
         messages.extend(tool_results)
 
-    if not actions_taken:
-        entry = alog.log(
-            "table", table_id, "no_op", {}, {"status": reading.status}, reasoning_text or None
+    if actions_taken:
+        # Tools were called — text summary is for logging only; actions are already recorded.
+        if not (reasoning_text and alog.validate_agent_response(reasoning_text)):
+            reasoning_text = reasoning_text or f"Executed {len(actions_taken)} corrective action(s)"
+            parsed = {
+                "zone_id": table_id,
+                "status": reading.status,
+                "observations": [
+                    {"param": ft, "value": "", "flag": "out of range"}
+                    for ft in reading.fault_types
+                ],
+                "actions": [],
+            }
+        else:
+            parsed = parse_agent_response(reasoning_text)
+    else:
+        # No tools called — the text response IS the decision (no_op path).
+        if reasoning_text and not alog.validate_agent_response(reasoning_text):
+            logger.warning("[%s] Agent response looked truncated; treating cycle as no_op", table_id)
+            reasoning_text = "all parameters within range"
+            parsed = {"zone_id": table_id, "status": reading.status, "observations": [], "actions": []}
+        else:
+            parsed = parse_agent_response(reasoning_text)
+    cycle_ms = int((time.monotonic() - cycle_start) * 1000)
+    effective_status = parsed.get("status") or reading.status
+    observation_summary = "all parameters within range"
+    if parsed.get("observations"):
+        observation_summary = "; ".join(
+            f"{obs.get('param', '')} {obs.get('flag', '')}".strip()
+            for obs in parsed.get("observations", [])
         )
-        asyncio.create_task(alog.broadcast_action(entry))
+    if not actions_taken:
+        actions_taken = [
+            alog.sanitize_action({
+                "zone_id": table_id,
+                "pod_id": pod.get("id", table_id),
+                "tool": "no_op",
+                "params": {},
+                "reason": observation_summary,
+                "status": pod.get("status") or effective_status,
+                "cycle_id": cycle_id,
+            })
+            for pod in (reading.pods or [{"id": table_id, "status": effective_status}])
+        ]
+
+    # One structured cycle entry — this is what gets broadcast to the frontend
+    cycle_entry = alog.log_cycle(
+        zone_id=table_id,
+        status=effective_status,
+        observations=parsed.get("observations", []),
+        actions_taken=actions_taken,
+        raw_reasoning=reasoning_text,
+        cycle_duration_ms=cycle_ms,
+        cycle_id=cycle_id,
+        crop=CROP_MAP.get(table_id),
+    )
+    asyncio.create_task(alog.broadcast_action(cycle_entry))
 
     for d in directives:
         message_bus.mark_directive_consumed(d["id"])
@@ -240,7 +406,7 @@ async def _run_cycle(table_id: str, client: AsyncOpenAI) -> None:
         "ts": datetime.now(timezone.utc).isoformat(),
     })
 
-    logger.info("[%s] Cycle complete — %d action(s)", table_id, len(actions_taken))
+    logger.info("[%s] Cycle complete — %d action(s) in %dms", table_id, len(actions_taken), cycle_ms)
 
 
 async def main(table_id: str) -> None:

@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,12 +26,13 @@ class FaultRequest(BaseModel):
 
 
 class ActionRequest(BaseModel):
-    timestamp: str
-    pod_id: str
-    sensor_state: dict
-    diagnosis: str
-    action: str
-    reasoning: str
+    """Legacy typed model kept for supervisor compat — /api/action also accepts raw JSON."""
+    timestamp: str = ""
+    pod_id: str = ""
+    sensor_state: dict = {}
+    diagnosis: str = ""
+    action: str = ""
+    reasoning: str = ""
 
 
 class ThoughtRequest(BaseModel):
@@ -62,8 +64,12 @@ def remove_client(client: WebSocket) -> None:
 async def broadcast(message: dict) -> None:
     if not clients:
         return
+    from agent.action_log import safe_json_serialize, validate_event
     stale: list[WebSocket] = []
-    payload = json.dumps(message)
+    payload_obj = validate_event(message) if message.get("type") in {
+        "agent_cycle_summary", "pod_agent_update", "agent_action",
+    } else safe_json_serialize(message)
+    payload = json.dumps(payload_obj)
     for client in list(clients):
         try:
             # FIX: Serialize per-client sends so heartbeat and simulator broadcasts cannot race each other.
@@ -177,10 +183,19 @@ async def post_fault(pod_id: str, body: FaultRequest) -> dict:
 
 
 @app.post("/api/action")
-async def post_action(body: ActionRequest) -> dict:
-    entry = body.model_dump()
+async def post_action(request: Request) -> dict:
+    try:
+        entry = await request.json()
+    except Exception:
+        return {"ok": False, "error": "invalid JSON"}
     state.append_decision(entry)
-    await broadcast({"type": "agent_decision", "entry": entry})
+    if entry.get("type") in {"agent_cycle_summary", "pod_agent_update", "agent_action"}:
+        if entry.get("type") == "pod_agent_update":
+            from agent import action_log as _alog
+            await _alog.remember_pod_action(entry)
+        await broadcast(entry)
+    else:
+        await broadcast({"type": "agent_decision", "entry": entry})
     return {"ok": True}
 
 
@@ -188,9 +203,9 @@ async def post_action(body: ActionRequest) -> dict:
 async def agent_status() -> dict:
     import os as _os
     from agent import message_bus as _mb
-    pods_per_table = int(_os.getenv("PODS_PER_TABLE", "5"))
+    pods_per_table = max(1, int(_os.getenv("PODS_PER_TABLE", "100")))
     total_pods = len(engine.pods)
-    table_count = total_pods // pods_per_table
+    table_count = max(1, math.ceil(total_pods / pods_per_table))
     table_ids = [f"T{i + 1}" for i in range(table_count)]
     last_cycles = _mb.get_table_last_cycles()
     return {
@@ -213,6 +228,12 @@ async def agent_status() -> dict:
 async def agent_logs() -> list[dict]:
     from agent import message_bus as _mb
     return _mb.get_recent_actions(50)
+
+
+@app.get("/agent/pod/{pod_id}/reasoning")
+async def pod_reasoning(pod_id: str) -> dict:
+    from agent import action_log as _alog
+    return await _alog.get_pod_reasoning(pod_id)
 
 
 @app.post("/api/agent/thought")
